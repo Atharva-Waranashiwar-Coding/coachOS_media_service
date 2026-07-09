@@ -1,0 +1,7 @@
+services:
+  media-service:
+    build: .
+    env_file:
+      - .env.example
+    ports:
+      - "8003:8000"
