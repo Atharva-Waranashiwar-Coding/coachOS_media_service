@@ -1,7 +1,23 @@
 services:
+  media-postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_DB: coachos_media, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    ports: ["5434:5432"]
+    volumes: ["media-postgres-data:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d coachos_media"], interval: 5s, timeout: 5s, retries: 10 }
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: minio, MINIO_ROOT_PASSWORD: minio-secret }
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio-data:/data"]
+  minio-init:
+    image: minio/mc:latest
+    depends_on: [minio]
+    entrypoint: ["/bin/sh", "-c", "until mc alias set local http://minio:9000 minio minio-secret; do sleep 2; done; mc mb --ignore-existing local/coachos-videos; mc anonymous set none local/coachos-videos"]
   media-service:
     build: .
-    env_file:
-      - .env.example
-    ports:
-      - "8003:8000"
+    env_file: [.env.example]
+    ports: ["8003:8000"]
+    depends_on: { media-postgres: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
+volumes: { media-postgres-data: {}, minio-data: {} }

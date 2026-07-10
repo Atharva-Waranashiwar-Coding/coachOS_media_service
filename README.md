@@ -1,88 +1,61 @@
 # CoachOS Media Service
 
-Video upload, storage metadata, and practice session service for CoachOS.
+Standalone FastAPI service owning practice sessions, private video records, signed S3-compatible uploads, upload verification, and upload lifecycle state.
 
-## Responsibilities
+## Architecture
 
-- Practice session records
-- Video upload metadata
-- Signed upload URL flow
-- Cloud storage integration
-- Video status tracking
-- Athlete and session video linking
+Thin versioned endpoints call domain services. Repositories own SQLAlchemy queries, `S3StorageProvider` owns boto3 behavior, and `AthleteServiceClient` verifies coach access without cross-service database reads. JWTs are validated locally with the shared Auth Service secret. Timeline publication is best-effort after a verified upload commits, forming the boundary for a future transactional outbox.
 
-## Tech Stack
+Owned tables are `practice_sessions` and `videos`. Athlete and user UUIDs are external references; only `videos.practice_session_id` is a local foreign key.
 
-- Python
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- Docker
-- Cloud object storage later
+## Upload Workflow
 
-## Project Structure
+1. Coach creates or opens a non-terminal practice session.
+2. `POST .../videos/upload-url` validates athlete access, filename, MIME type, and size.
+3. The service creates a pending video and returns a presigned PUT URL requiring `Content-Type`.
+4. The browser uploads bytes directly to private S3 or MinIO.
+5. `POST /videos/{id}/complete-upload` performs S3 `HEAD`, validates size and MIME type, and marks the video uploaded.
+6. The service optionally publishes a safe `video_uploaded` timeline event. Failure does not undo upload completion.
 
-- `app/api`: API route modules
-- `app/core`: configuration
-- `app/db`: database connection and session setup
-- `app/models`: database models
-- `app/schemas`: request and response schemas
-- `app/services`: media and storage business logic
-- `app/utils`: shared utilities
-- `alembic`: database migrations
-- `tests`: service tests
+## API
 
-## Environment
+- `POST/GET /api/v1/practice-sessions`
+- `GET/PATCH /api/v1/practice-sessions/{id}`
+- `POST /api/v1/practice-sessions/{id}/complete`
+- `POST /api/v1/practice-sessions/{id}/cancel`
+- `POST /api/v1/practice-sessions/{id}/videos/upload-url`
+- `GET /api/v1/practice-sessions/{id}/videos`
+- `POST /api/v1/videos/{id}/complete-upload`
+- `GET/DELETE /api/v1/videos/{id}`
+- `GET /api/v1/athletes/{id}/videos`
+- `GET /health/live`, `GET /health/ready`, OpenAPI at `/docs`
 
-Copy `.env.example` to `.env` for local development. Do not commit `.env`.
+## Setup
 
-Required values:
-
-- `APP_NAME`
-- `ENVIRONMENT`
-- `DATABASE_URL`
-
-Future storage values:
-
-- `STORAGE_PROVIDER`
-- `STORAGE_BUCKET`
-- `STORAGE_REGION`
-
-## Running Locally
+Use `.env.example` as the configuration reference. Important groups are database and JWT settings, Athlete Service URLs, S3 credentials/bucket/endpoint, upload expiry and limits, timeline service credentials, pagination, logging, and CORS. `VITE_*`-style public variables are not used here.
 
 ```bash
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+alembic upgrade head
+uvicorn app.main:app --reload --port 8003
 ```
 
-The service exposes:
-
-- Local app: `http://localhost:8000`
-- Docker Compose port: `http://localhost:8003`
-- Health check: `GET /health`
-
-## Docker
+Docker Compose starts PostgreSQL on `5434`, MinIO on `9000` with console `9001`, creates the private `coachos-videos` bucket, and starts the API on `8003`:
 
 ```bash
 docker compose up --build
+docker compose exec media-service alembic upgrade head
 ```
 
-## Planned API
-
-- `POST /practice-sessions`
-- `GET /practice-sessions/{session_id}`
-- `POST /videos/upload-url`
-- `POST /videos/{video_id}/complete-upload`
-- `GET /videos/{video_id}`
-- `GET /athletes/{athlete_id}/videos`
-
-## Testing
+## Quality
 
 ```bash
-pytest
+black --check app tests alembic
+ruff check app tests alembic
+mypy app
+pytest -q
 ```
 
-## Status
+Security decisions include private buckets, short-lived signed PUT URLs, signed content type, no proxied bytes, no permanent media URLs, no logged tokens/URLs/credentials, soft deletion, hidden cross-coach resources, and storage verification before trusting completion.
 
-Stage 0: service skeleton created. Practice session models, signed upload flow, storage integration, and tests are next.
+Known limitations: single-part uploads only, no media probing/transcoding/thumbnails, synchronous best-effort timeline delivery, shared-secret JWT validation, and storage deletion preceding the database soft-delete transaction. AI Review can later consume uploaded video IDs and private storage references through trusted service APIs without changing public bucket policy.
