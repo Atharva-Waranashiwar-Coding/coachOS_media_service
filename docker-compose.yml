@@ -20,4 +20,9 @@ services:
     env_file: [.env.example]
     ports: ["8003:8000"]
     depends_on: { media-postgres: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
+  outbox-worker:
+    build: .
+    command: ["python", "-m", "app.workers.outbox_publisher"]
+    env_file: [.env.example]
+    depends_on: { media-postgres: { condition: service_healthy } }
 volumes: { media-postgres-data: {}, minio-data: {} }

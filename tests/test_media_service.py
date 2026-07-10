@@ -2,9 +2,11 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
 
 from app.core.exceptions import BadRequestError, ConflictError, PayloadTooLargeError, UnsupportedMediaTypeError
 from app.models.enums import SessionStatus, SessionType, UploadStatus
+from app.models.outbox import OutboxEvent
 from app.schemas.media import PracticeSessionCreate, PracticeSessionUpdate, UploadCompletionRequest, UploadUrlRequest
 from app.services.media import PracticeSessionService, VideoService
 from app.storage.base import ObjectMetadata
@@ -126,7 +128,10 @@ def test_complete_verifies_storage_and_is_idempotent(db):
     first = videos.complete(upload.video_id, UploadCompletionRequest(checksum="sha"), created.coach_user_id, "token")
     second = videos.complete(upload.video_id, UploadCompletionRequest(), created.coach_user_id, "token")
     assert first.upload_status == second.upload_status == UploadStatus.UPLOADED
-    assert first.etag == "storage-etag" and len(timeline.calls) == 1
+    assert first.etag == "storage-etag"
+    assert (
+        db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.event_type == "video_uploaded")) == 1
+    )
 
 
 @pytest.mark.parametrize(

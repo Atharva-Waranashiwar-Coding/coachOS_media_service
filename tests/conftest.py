@@ -5,6 +5,7 @@ os.environ.update(
         "DATABASE_URL": "sqlite+pysqlite:///:memory:",
         "JWT_SECRET_KEY": "test-secret",
         "ATHLETE_SERVICE_URL": "http://athletes.test",
+        "ATHLETE_SERVICE_INTERNAL_URL": "http://athletes.test",
         "AWS_ACCESS_KEY_ID": "test",
         "AWS_SECRET_ACCESS_KEY": "test",
         "S3_BUCKET_NAME": "test-videos",

@@ -29,6 +29,7 @@ from app.schemas.media import (
     VideoListResponse,
     VideoResponse,
 )
+from app.services.timeline_events import timeline_outbox
 from app.storage.base import StorageProvider
 from app.utils.files import sanitize_filename
 
@@ -46,6 +47,20 @@ class PracticeSessionService:
         item = PracticeSession(**payload.model_dump(), coach_user_id=coach_id)
         try:
             self.repo.add_session(item)
+            self.db.flush()
+            self.db.add(
+                timeline_outbox(
+                    athlete_id=item.athlete_id,
+                    event_type="practice_session_created",
+                    category="practice",
+                    title="Practice session created",
+                    aggregate_type="practice_session",
+                    aggregate_id=item.id,
+                    actor_user_id=coach_id,
+                    occurred_at=item.created_at or datetime.now(UTC),
+                    metadata={"session_type": item.session_type.value},
+                )
+            )
             self.db.commit()
             self.db.refresh(item)
         except Exception:
@@ -101,6 +116,25 @@ class PracticeSessionService:
         item.status = target
         item.completed_at = datetime.now(UTC) if target == SessionStatus.COMPLETED else None
         try:
+            event_type = (
+                "practice_session_completed" if target == SessionStatus.COMPLETED else "practice_session_cancelled"
+            )
+            self.db.add(
+                timeline_outbox(
+                    athlete_id=item.athlete_id,
+                    event_type=event_type,
+                    category="practice",
+                    title=(
+                        "Practice session completed"
+                        if target == SessionStatus.COMPLETED
+                        else "Practice session cancelled"
+                    ),
+                    aggregate_type="practice_session",
+                    aggregate_id=item.id,
+                    actor_user_id=coach_id,
+                    occurred_at=item.completed_at or datetime.now(UTC),
+                )
+            )
             self.db.commit()
             self.db.refresh(item)
         except Exception:
@@ -199,25 +233,28 @@ class VideoService:
         video.upload_status, video.uploaded_at = UploadStatus.UPLOADED, datetime.now(UTC)
         video.etag, video.checksum, video.failure_reason = metadata.etag or payload.etag, payload.checksum, None
         try:
+            self.db.add(
+                timeline_outbox(
+                    athlete_id=video.athlete_id,
+                    event_type="video_uploaded",
+                    category="video",
+                    title="Practice video uploaded",
+                    aggregate_type="video",
+                    aggregate_id=video.id,
+                    actor_user_id=coach_id,
+                    occurred_at=video.uploaded_at,
+                    metadata={
+                        "practice_session_id": str(video.practice_session_id),
+                        "content_type": video.content_type,
+                        "file_size_bytes": video.file_size_bytes,
+                    },
+                )
+            )
             self.db.commit()
             self.db.refresh(video)
         except Exception:
             self.db.rollback()
             raise
-        try:
-            self.timeline.publish_video_uploaded(
-                athlete_id=video.athlete_id,
-                video_id=video.id,
-                session_id=video.practice_session_id,
-                content_type=video.content_type,
-                file_size_bytes=video.file_size_bytes,
-                occurred_at=video.uploaded_at,
-                session_title=video.practice_session.title,
-            )
-        except Exception:
-            logger.exception(
-                "timeline_publish_failed", extra={"video_id": str(video.id), "operation_outcome": "failure"}
-            )
         return VideoResponse.model_validate(video)
 
     def get(self, video_id: UUID, coach_id: UUID, token: str) -> VideoResponse:
@@ -241,6 +278,19 @@ class VideoService:
             self.storage.delete_object(video.storage_key)
         video.upload_status, video.deleted_at = UploadStatus.DELETED, datetime.now(UTC)
         try:
+            self.db.add(
+                timeline_outbox(
+                    athlete_id=video.athlete_id,
+                    event_type="video_deleted",
+                    category="video",
+                    title="Practice video removed",
+                    aggregate_type="video",
+                    aggregate_id=video.id,
+                    actor_user_id=coach_id,
+                    occurred_at=video.deleted_at,
+                    visibility="coach_only",
+                )
+            )
             self.db.commit()
         except Exception:
             self.db.rollback()

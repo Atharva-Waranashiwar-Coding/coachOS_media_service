@@ -15,7 +15,8 @@ Owned tables are `practice_sessions` and `videos`. Athlete and user UUIDs are ex
 3. The service creates a pending video and returns a presigned PUT URL requiring `Content-Type`.
 4. The browser uploads bytes directly to private S3 or MinIO.
 5. `POST /videos/{id}/complete-upload` performs S3 `HEAD`, validates size and MIME type, and marks the video uploaded.
-6. The service optionally publishes a safe `video_uploaded` timeline event. Failure does not undo upload completion.
+6. The transaction inserts a stable `video_uploaded` outbox event.
+7. A separate worker delivers it to Athlete Service; failures retry without undoing upload completion.
 
 ## API
 
@@ -45,6 +46,9 @@ Docker Compose starts PostgreSQL on `5434`, MinIO on `9000` with console `9001`,
 ```bash
 docker compose up --build
 docker compose exec media-service alembic upgrade head
+python -m app.workers.outbox_publisher
+python -m app.workers.outbox_admin inspect
+python -m app.workers.outbox_admin retry-failed
 ```
 
 ## Quality

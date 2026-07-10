@@ -40,3 +40,10 @@ class ProcessingStatus(StrEnum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class OutboxStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    PUBLISHED = "published"
+    FAILED = "failed"

@@ -1,4 +1,15 @@
-from app.models.enums import ProcessingStatus, SessionStatus, SessionType, UploadStatus, UserRole
+from app.models.enums import OutboxStatus, ProcessingStatus, SessionStatus, SessionType, UploadStatus, UserRole
 from app.models.media import PracticeSession, Video
+from app.models.outbox import OutboxEvent
 
-__all__ = ["PracticeSession", "Video", "ProcessingStatus", "SessionStatus", "SessionType", "UploadStatus", "UserRole"]
+__all__ = [
+    "PracticeSession",
+    "Video",
+    "OutboxEvent",
+    "OutboxStatus",
+    "ProcessingStatus",
+    "SessionStatus",
+    "SessionType",
+    "UploadStatus",
+    "UserRole",
+]
