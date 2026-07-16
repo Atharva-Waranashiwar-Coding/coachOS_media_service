@@ -9,8 +9,3 @@ email-validator==2.2.0
 httpx==0.28.1
 boto3==1.39.13
 prometheus-client==0.21.1
-pytest==8.4.1
-pytest-cov==6.2.1
-ruff==0.12.4
-black==25.1.0
-mypy==1.17.0

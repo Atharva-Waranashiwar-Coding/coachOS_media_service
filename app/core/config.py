@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     delete_storage_objects: bool = Field(default=True, alias="DELETE_STORAGE_OBJECTS")
     timeline_publishing_enabled: bool = Field(default=False, alias="TIMELINE_PUBLISHING_ENABLED")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
+    request_id_header: str = Field(default="X-Request-ID", alias="REQUEST_ID_HEADER")
     default_page_size: int = Field(default=20, alias="DEFAULT_PAGE_SIZE", gt=0)
     max_page_size: int = Field(default=100, alias="MAX_PAGE_SIZE", gt=0, le=500)
     cors_origins: list[str] = Field(default_factory=list, alias="CORS_ORIGINS")

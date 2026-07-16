@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.core.logging import configure_logging, register_request_logging
+from app.core.logging import configure_logging
+from app.core.observability import register_observability
 from app.db.session import SessionLocal
 from app.storage.s3 import S3StorageProvider
 
@@ -19,7 +21,7 @@ if settings.cors_origins:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-register_request_logging(app)
+register_observability(app)
 register_exception_handlers(app)
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
@@ -31,10 +33,11 @@ def live() -> dict[str, str]:
 
 @app.get("/health/ready")
 def ready() -> dict[str, str]:
-    with SessionLocal() as db:
-        db.execute(text("SELECT 1"))
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Database is unavailable.") from exc
     if not S3StorageProvider().bucket_accessible():
-        from app.core.exceptions import StorageServiceError
-
-        raise StorageServiceError("Storage bucket is not accessible.")
+        raise HTTPException(status_code=503, detail="Storage is unavailable.")
     return {"status": "ready", "database": "ok", "storage": "ok"}

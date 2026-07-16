@@ -1,28 +1,71 @@
 services:
   media-postgres:
     image: postgres:16-alpine
-    environment: { POSTGRES_DB: coachos_media, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: coachos_media
+      POSTGRES_USER: coachos_media
+      POSTGRES_PASSWORD: ${MEDIA_DB_PASSWORD:-postgres}
     ports: ["5434:5432"]
-    volumes: ["media-postgres-data:/var/lib/postgresql/data"]
-    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d coachos_media"], interval: 5s, timeout: 5s, retries: 10 }
+    volumes: [media-postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coachos_media -d coachos_media"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     command: server /data --console-address ":9001"
-    environment: { MINIO_ROOT_USER: minio, MINIO_ROOT_PASSWORD: minio-secret }
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-secret}
     ports: ["9000:9000", "9001:9001"]
-    volumes: ["minio-data:/data"]
+    volumes: [minio-data:/data]
+
   minio-init:
-    image: minio/mc:latest
-    depends_on: [minio]
-    entrypoint: ["/bin/sh", "-c", "until mc alias set local http://minio:9000 minio minio-secret; do sleep 2; done; mc mb --ignore-existing local/coachos-videos; mc anonymous set none local/coachos-videos"]
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      minio: {condition: service_started}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 2; done &&
+        mc mb --ignore-existing local/coachos-videos &&
+        mc anonymous set none local/coachos-videos
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-secret}
+
   media-service:
     build: .
-    env_file: [.env.example]
+    restart: unless-stopped
+    init: true
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://coachos_media:${MEDIA_DB_PASSWORD:-postgres}@media-postgres:5432/coachos_media
+      S3_ENDPOINT_URL: http://minio:9000
+      RUN_MIGRATIONS: "true"
     ports: ["8003:8000"]
-    depends_on: { media-postgres: { condition: service_healthy }, minio-init: { condition: service_completed_successfully } }
+    depends_on:
+      media-postgres: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+
   outbox-worker:
     build: .
     command: ["python", "-m", "app.workers.outbox_publisher"]
-    env_file: [.env.example]
-    depends_on: { media-postgres: { condition: service_healthy } }
-volumes: { media-postgres-data: {}, minio-data: {} }
+    restart: unless-stopped
+    init: true
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+psycopg://coachos_media:${MEDIA_DB_PASSWORD:-postgres}@media-postgres:5432/coachos_media
+      S3_ENDPOINT_URL: http://minio:9000
+      RUN_MIGRATIONS: "false"
+    depends_on:
+      media-service: {condition: service_healthy}
+
+volumes:
+  media-postgres-data:
+  minio-data:

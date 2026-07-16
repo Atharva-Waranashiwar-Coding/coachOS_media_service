@@ -45,11 +45,21 @@ Docker Compose starts PostgreSQL on `5434`, MinIO on `9000` with console `9001`,
 
 ```bash
 docker compose up --build
-docker compose exec media-service alembic upgrade head
 python -m app.workers.outbox_publisher
 python -m app.workers.outbox_admin inspect
 python -m app.workers.outbox_admin retry-failed
 ```
+
+The API entrypoint runs `alembic upgrade head` automatically. The outbox worker sets `RUN_MIGRATIONS=false` and waits for API readiness. The multi-stage image runs as UID/GID `10001`.
+
+## Production Operations
+
+- `GET /health/live` reports process liveness.
+- `GET /health/ready` verifies PostgreSQL and object-storage availability.
+- `GET /metrics` exposes Prometheus request metrics.
+- JSON stdout logs include propagated or generated `X-Request-ID` values.
+
+Production routing, CORS allowlists, edge rate limiting, database and Nginx exporters, Loki collection, and PostgreSQL backups live in `coachos-infra`. Video objects are not included in PostgreSQL dumps and need a separate MinIO bucket backup or replication policy.
 
 ## Quality
 
