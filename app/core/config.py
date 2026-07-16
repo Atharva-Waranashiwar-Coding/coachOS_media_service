@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     max_page_size: int = Field(default=100, alias="MAX_PAGE_SIZE", gt=0, le=500)
     cors_origins: list[str] = Field(default_factory=list, alias="CORS_ORIGINS")
     upstream_timeout_seconds: float = Field(default=5.0, alias="UPSTREAM_TIMEOUT_SECONDS", gt=0)
+    insight_max_batch_athletes: int = Field(default=100, alias="INSIGHT_MAX_BATCH_ATHLETES", gt=0, le=500)
+    insight_internal_service_token: str | None = Field(default=None, alias="INSIGHT_INTERNAL_SERVICE_TOKEN")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

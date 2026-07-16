@@ -63,3 +63,14 @@ pytest -q
 Security decisions include private buckets, short-lived signed PUT URLs, signed content type, no proxied bytes, no permanent media URLs, no logged tokens/URLs/credentials, soft deletion, hidden cross-coach resources, and storage verification before trusting completion.
 
 Known limitations: single-part uploads only, no media probing/transcoding/thumbnails, synchronous best-effort timeline delivery, shared-secret JWT validation, and storage deletion preceding the database soft-delete transaction. AI Review can later consume uploaded video IDs and private storage references through trusted service APIs without changing public bucket policy.
+
+## Progress Activity Summary
+
+Stage 10 adds:
+
+- `GET /api/v1/insights/athletes/{athlete_id}/activity`
+- `POST /api/v1/insights/athletes/activity-summary`
+
+The service returns grouped current/comparison counts for practice sessions created, sessions completed, uploaded non-deleted videos, and latest session activity. Date filters use start-inclusive, end-exclusive UTC boundaries.
+
+The single-athlete endpoint verifies coach access. The batch endpoint accepts authenticated Athlete Service calls and rejects more than `INSIGHT_MAX_BATCH_ATHLETES`. Responses never expose storage keys, bucket names, signed URLs, credentials, or deleted-video details. Configure internal authentication with `INSIGHT_INTERNAL_SERVICE_TOKEN` or the shared internal token.
