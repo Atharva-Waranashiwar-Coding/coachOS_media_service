@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 from sqlalchemy import (
     BigInteger,
     DateTime,
-    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -19,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 from app.models.enums import ProcessingStatus, SessionStatus, SessionType, UploadStatus
+from app.models.types import postgres_enum
 
 
 class PracticeSession(Base):
@@ -36,9 +36,9 @@ class PracticeSession(Base):
     description: Mapped[str | None] = mapped_column(Text)
     session_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     location: Mapped[str | None] = mapped_column(String(200))
-    session_type: Mapped[SessionType] = mapped_column(Enum(SessionType, name="session_type"))
+    session_type: Mapped[SessionType] = mapped_column(postgres_enum(SessionType, name="session_type"))
     status: Mapped[SessionStatus] = mapped_column(
-        Enum(SessionStatus, name="session_status"), default=SessionStatus.DRAFT
+        postgres_enum(SessionStatus, name="session_status"), default=SessionStatus.DRAFT
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -75,10 +75,10 @@ class Video(Base):
     checksum: Mapped[str | None] = mapped_column(String(255))
     etag: Mapped[str | None] = mapped_column(String(255))
     upload_status: Mapped[UploadStatus] = mapped_column(
-        Enum(UploadStatus, name="upload_status"), default=UploadStatus.PENDING
+        postgres_enum(UploadStatus, name="upload_status"), default=UploadStatus.PENDING
     )
     processing_status: Mapped[ProcessingStatus] = mapped_column(
-        Enum(ProcessingStatus, name="processing_status"), default=ProcessingStatus.NOT_STARTED
+        postgres_enum(ProcessingStatus, name="processing_status"), default=ProcessingStatus.NOT_STARTED
     )
     failure_reason: Mapped[str | None] = mapped_column(Text)
     upload_url_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
