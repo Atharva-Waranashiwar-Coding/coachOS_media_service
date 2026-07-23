@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = Field(alias="AWS_SECRET_ACCESS_KEY")
     s3_bucket_name: str = Field(alias="S3_BUCKET_NAME")
     s3_endpoint_url: str | None = Field(default=None, alias="S3_ENDPOINT_URL")
+    s3_public_endpoint_url: str | None = Field(default=None, alias="S3_PUBLIC_ENDPOINT_URL")
     s3_presigned_url_expiration_seconds: int = Field(
         default=900, alias="S3_PRESIGNED_URL_EXPIRATION_SECONDS", ge=60, le=86400
     )

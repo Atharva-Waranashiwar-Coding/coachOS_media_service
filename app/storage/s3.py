@@ -20,13 +20,20 @@ class S3StorageProvider:
             aws_secret_access_key=settings.aws_secret_access_key,
             endpoint_url=settings.s3_endpoint_url,
         )
+        self.upload_client = client or boto3.client(
+            "s3",
+            region_name=settings.aws_region,
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            endpoint_url=settings.s3_public_endpoint_url or settings.s3_endpoint_url,
+        )
         self.bucket = settings.s3_bucket_name
 
     def generate_upload_url(self, key: str, content_type: str, expires_in: int) -> str:
         try:
             return cast(
                 str,
-                self.client.generate_presigned_url(
+                self.upload_client.generate_presigned_url(
                     "put_object",
                     Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
                     ExpiresIn=expires_in,
